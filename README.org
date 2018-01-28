@@ -1,0 +1,10 @@
+* Aqua Orb
+This is a simple scheduler that can receive a set commands via bluetooth in the form of char a array, and use that schedule to control a servo's open and close radius on the schedule. The open and close radius and schedule pattern is static and can only repeat consitently (i.e. leave valve in position A for X amount of time, then leave valve in position B for Y amount of time, repeat). To be blunt, this thing is dumb as a rock.
+
+If no pattern is sent via bluetooth, the plant will use the pattern defined in ~defaultOpts[]~. There is a PCD8544 LCD print at certain events, and the name of the plant is the last parameter set in the options char.
+
+* TODOs
+** TODO Save options sent via BTSerial to EEPROM
+Likely this would be in the form of an additional type of BTSerial input allowing to save current options long term.
+** TODO Clean up format of options char. 
+Use better pattern for options to be sent in. At the very least, remove the extra pipe character.
