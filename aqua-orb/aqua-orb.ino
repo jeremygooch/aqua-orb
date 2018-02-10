@@ -6,7 +6,6 @@
 SoftwareSerial BTserial(8, 9); // RX | TX
 
 TimerObject *timer1 = new TimerObject(1000); // Main loop timer
-TimerObject *timer2 = new TimerObject(1000); // BT loop timer
 
 Servo myservo;  // create servo object to control a servo
 
@@ -17,7 +16,7 @@ boolean singleClose = false;
 int singleCloseCounter = 5;
 
 const byte numChars = 60;
-const char defaultOpts[] = "f:00324000t:0002|o:000|c:100|n:Pilea AluminumPlant";
+const char defaultOpts[] = "f:00000600t:0002|o:000|c:100|n:Pilea AluminumPlant";
 char receivedChars[numChars];
 boolean newData = false;
 
@@ -32,6 +31,8 @@ boolean systemTestDone = false;
 boolean interruptCMD = false;
 
 int servoFlag = 0;
+
+
 #define pinServo A0
 
 static PCD8544 lcd;
@@ -50,6 +51,7 @@ void setup()
 
     myservo.attach(pinServo);  // attaches the servo to the servo object
     buildOptions(0);
+    Serial.println(servoClose);
     /* Serial.println("global options are: "); */
     /* Serial.println(offTime); */
     /* Serial.println(openTime); */
@@ -57,9 +59,6 @@ void setup()
     /* Serial.println(servoOpen); */
     /* Serial.println(label); */
     /* Serial.println("------------------"); */
-
-    timer2->setOnTimer(&btLoop);
-    timer2->Start();
 
     timer1->setOnTimer(&mainWaterLoop);
     timer1->Start();
@@ -69,7 +68,6 @@ void loop()
 {
     digitalWrite(LED_BUILTIN, LOW);
 
-    timer2->Update();
     timer1->Update();
 }
 
@@ -78,10 +76,10 @@ void btLoop() {
         recvWithMarkers();
     }
     if (newData) {
-        timer2->Stop();
+        /* timer1->Stop(); */
         parseData();
-        timer2->setOnTimer(&btLoop);
-        timer2->Start();
+        /* timer1->setOnTimer(&btLoop); */
+        /* timer1->Start(); */
     }
 }
 
@@ -129,6 +127,7 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
     }
 
     if (systemTestDone && interruptCMD == false) {
+        btLoop();
         /* Serial.println("waterInterval"); */
         /* Serial.println(waterInterval); */
         if (waterInterval > 0) {
@@ -246,63 +245,30 @@ void parseData()
         /* Serial.println("bt command received for update configs..."); */
         timer1->Stop();
         buildOptions(1);
-        /* Serial.println(offTime); */
-        /* Serial.println(openTime); */
-        /* Serial.println(servoClose); */
-        /* Serial.println(servoOpen); */
-        /* Serial.println(servoClose); */
-        /* Serial.println(label); */
-        /* Serial.println("recreating main loop with new values..."); */
+
         mainWaterLoop(true, offTime, openTime, servoOpen, servoClose);
         timer1->setOnTimer(&mainWaterLoop);
         timer1->Start();
     /* } */
-    } else if (receivedChars[0] == 'q' && receivedChars[1] == 'f') {
-        /* f:00324000t:0002|o:000|c:100|n:Pilea AluminumPlant */
-        char *foo = "[f:00324000]";
-        String bar;
-        bar = foo;
-        BTserial.print(bar);
-        /* BTserial.print(buz); */
-        /* BTserial.print(buz); */
-        /* BTserial.print(baz); */
-
-        /* for (i=0;i<strlen(foo); i++) { */
-        /*     BTserial.print(foo[i]); */
-        /*     /\* BTserial.write(foo[i]); *\/ */
-        /* } */
-
-        /* BTserial.write(0x48); */
-        /* BTserial.write(0x45); */
-        /* BTserial.write(0x4C); */
-        /* BTserial.write(0x4C); */
-        /* BTserial.write(0x4F); */
-
-        /* Serial.write(0x48); */
-        /* Serial.write(0x45); */
-        /* Serial.write(0x4C); */
-        /* Serial.write(0x4C); */
-        /* Serial.write(0x4F); */
-    } else if (receivedChars[0] == 'q' && receivedChars[1] == 'n') {
-        char *foo1 = "[n:This is a name]";
-        String bar1;
-        bar1 = foo1;
-        BTserial.print(bar1);
+    } else if (receivedChars[0] == 'q') {
+        String out;
+        if (receivedChars[1] == 'f') { // frequency open
+            out = offTime;
+        } else if (receivedChars[1] == 'n') { // name/ plant label
+            out = label;
+        } else if (receivedChars[1] == 't') { // time open
+            out = openTime;
+        } else if (receivedChars[1] == 'o') { // open value
+            out = servoOpen;
+        } else if (receivedChars[1] == 'c') { // closed value
+            out = servoClose;
+        } else {
+            out = 'Invalid option provided';
+        }
+        out = '[' + out + ']';
+        BTserial.print(out);
     }
 }
-
-
-
-
-/* void writeString(String stringData) { // Used to serially push out a String with Serial.write() */
-
-/*   for (int i = 0; i < stringData.length(); i++) */
-/*   { */
-/*     BTserial.write(stringData[i]);   // Push each char 1 by 1 on each loop pass */
-/*   } */
-
-/* }// end writeString */
-
 
 void buildOptions(int optType)
 {
@@ -333,6 +299,8 @@ void buildOptions(int optType)
     strncpy (servoCloseArr, opts + 25, 3);
     servoCloseArr[3] = '\0';
     servoClose = atol(servoCloseArr);
+    Serial.write("calculating servoClosed...");
+    Serial.println(servoClose);
 
     strncpy (label, opts + 31, 25);
     label[25] = '\0';
