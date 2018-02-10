@@ -6,6 +6,7 @@
 SoftwareSerial BTserial(8, 9); // RX | TX
 
 TimerObject *timer1 = new TimerObject(1000); // Main loop timer
+TimerObject *timer2 = new TimerObject(1000); // BT loop timer
 
 Servo myservo;  // create servo object to control a servo
 
@@ -16,12 +17,13 @@ boolean singleClose = false;
 int singleCloseCounter = 5;
 
 const byte numChars = 60;
-const char defaultOpts[] = "f:00432000t:0004|o:000|c:100|n:Rattlesnake Plant";
+const char defaultOpts[] = "f:00324000t:0002|o:000|c:100|n:Pilea AluminumPlant";
 char receivedChars[numChars];
 boolean newData = false;
 
 static long offTime = 32;
 static long openTime = 23;
+String prevTime;
 int servoOpen = 0;
 int servoClose = 0;
 char label[25];
@@ -37,7 +39,7 @@ static PCD8544 lcd;
 void setup()
 {
     Serial.begin(9600);
-    Serial.println("Arduino is ready");
+    /* Serial.println("Arduino is ready"); */
 
     lcd.begin(84, 48);
 
@@ -56,6 +58,9 @@ void setup()
     /* Serial.println(label); */
     /* Serial.println("------------------"); */
 
+    timer2->setOnTimer(&btLoop);
+    timer2->Start();
+
     timer1->setOnTimer(&mainWaterLoop);
     timer1->Start();
 }
@@ -63,23 +68,35 @@ void setup()
 void loop()
 {
     digitalWrite(LED_BUILTIN, LOW);
-    if (BTserial.available() > 0) { recvWithMarkers(); }
-    if (newData) { parseData(); }
+
+    timer2->Update();
     timer1->Update();
+}
+
+void btLoop() {
+    if (BTserial.available() > 0) {
+        recvWithMarkers();
+    }
+    if (newData) {
+        timer2->Stop();
+        parseData();
+        timer2->setOnTimer(&btLoop);
+        timer2->Start();
+    }
 }
 
 void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svCl) {
 
     if (updateVars == true) {
-        Serial.println("must need to update the values");
+        /* Serial.println("must need to update the values"); */
         offTime = ofTim;
         openTime = onTim;
         servoOpen = svOp;
         servoClose = svCl;
-        Serial.println(offTime);
-        Serial.println(openTime);
-        Serial.println(servoOpen);
-        Serial.println(servoClose);
+        /* Serial.println(offTime); */
+        /* Serial.println(openTime); */
+        /* Serial.println(servoOpen); */
+        /* Serial.println(servoClose); */
     }
     /* Serial.println("in main loop, offTime is--"); */
     /* Serial.println(offTime); */
@@ -112,17 +129,20 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
     }
 
     if (systemTestDone && interruptCMD == false) {
-        Serial.println("waterInterval");
-        Serial.println(waterInterval);
+        /* Serial.println("waterInterval"); */
+        /* Serial.println(waterInterval); */
         if (waterInterval > 0) {
+            // Only update lcd if the time has changed
             remainingTime= humanReadableTime(waterInterval);
-            lcd.setCursor(0, 0);
-            lcd.print("Nxt Schd Water");
-            lcd.setCursor(0, 1);
-            lcd.print(String(remainingTime) + String("     "));
-            lcd.setCursor(0, 3);
-            lcd.print(String(label));
-            waterInterval--;
+            if (remainingTime != prevTime) {
+                lcd.setCursor(0, 0);
+                lcd.print("Watering in:  ");
+                lcd.setCursor(0, 1);
+                lcd.print(String(remainingTime) + String("     "));
+                lcd.setCursor(0, 3);
+                lcd.print(String(label));
+                waterInterval--;
+            }
         } else {
             toggleServo(true);
             if (waterOpenTime > 0) {
@@ -167,18 +187,27 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
 
 String humanReadableTime(double x) {
     String out;
+    String plural;
     long v = 0;
     if (x >= 86400) {
         v = x / 86400;
-        out = (int)(round(v)) + String("day");
+        if (x >= 172800) { plural = "s"; }
+        else { plural = ""; }
+        out = (int)(round(v)) + String("day") + plural;
     } else if (x < 86400 && x >= 3600) {
         v = x / 3600;
-        out = (int)(round(v)) + String("hr");
+        if (x >= 7200) {
+            out = (int)(round(v)) + String("-ish hrs") + plural;
+        } else {
+            out = String("about an hour or so");
+        }
     } else if (x < 3600 && x >= 60) {
         v = x / 60;
-        out = (int)(round(v)) + String("min");
+        if (x >= 120) { plural = "s"; }
+        else { plural = ""; }
+        out = (int)(round(v)) + String("-ish min") + plural;
     } else if (x < 60) {
-        out = (int)x + String("sec");
+        out = (int)x + String("sec       ");
     }
     return out;
 }
@@ -199,7 +228,7 @@ void toggleServo(boolean open) {
 void parseData()
 {
     newData = false;
-    Serial.println(receivedChars);
+    /* Serial.println(receivedChars); */
     if (receivedChars[0] == 't') {
         if (interruptCMD == false) { // make sure nothing odd is running
             // Temporarily turn the servo for a set amount of time
@@ -208,27 +237,72 @@ void parseData()
             singleCloseCounter = atol(digitsOnly);
 
             buildOptions(0);
-            Serial.println(servoClose);
-            Serial.println(servoOpen);
+            /* Serial.println(servoClose); */
+            /* Serial.println(servoOpen); */
             singleClose = true;
         }
     } else if (receivedChars[0] == 'f') {
         // Set the frequency and options
-        Serial.println("bt command received for update configs...");
+        /* Serial.println("bt command received for update configs..."); */
         timer1->Stop();
         buildOptions(1);
-        Serial.println(offTime);
-        Serial.println(openTime);
-        Serial.println(servoClose);
-        Serial.println(servoOpen);
-        Serial.println(servoClose);
-        Serial.println(label);
-        Serial.println("recreating main loop with new values...");
+        /* Serial.println(offTime); */
+        /* Serial.println(openTime); */
+        /* Serial.println(servoClose); */
+        /* Serial.println(servoOpen); */
+        /* Serial.println(servoClose); */
+        /* Serial.println(label); */
+        /* Serial.println("recreating main loop with new values..."); */
         mainWaterLoop(true, offTime, openTime, servoOpen, servoClose);
         timer1->setOnTimer(&mainWaterLoop);
         timer1->Start();
+    /* } */
+    } else if (receivedChars[0] == 'q' && receivedChars[1] == 'f') {
+        /* f:00324000t:0002|o:000|c:100|n:Pilea AluminumPlant */
+        char *foo = "[f:00324000]";
+        String bar;
+        bar = foo;
+        BTserial.print(bar);
+        /* BTserial.print(buz); */
+        /* BTserial.print(buz); */
+        /* BTserial.print(baz); */
+
+        /* for (i=0;i<strlen(foo); i++) { */
+        /*     BTserial.print(foo[i]); */
+        /*     /\* BTserial.write(foo[i]); *\/ */
+        /* } */
+
+        /* BTserial.write(0x48); */
+        /* BTserial.write(0x45); */
+        /* BTserial.write(0x4C); */
+        /* BTserial.write(0x4C); */
+        /* BTserial.write(0x4F); */
+
+        /* Serial.write(0x48); */
+        /* Serial.write(0x45); */
+        /* Serial.write(0x4C); */
+        /* Serial.write(0x4C); */
+        /* Serial.write(0x4F); */
+    } else if (receivedChars[0] == 'q' && receivedChars[1] == 'n') {
+        char *foo1 = "[n:This is a name]";
+        String bar1;
+        bar1 = foo1;
+        BTserial.print(bar1);
     }
 }
+
+
+
+
+/* void writeString(String stringData) { // Used to serially push out a String with Serial.write() */
+
+/*   for (int i = 0; i < stringData.length(); i++) */
+/*   { */
+/*     BTserial.write(stringData[i]);   // Push each char 1 by 1 on each loop pass */
+/*   } */
+
+/* }// end writeString */
+
 
 void buildOptions(int optType)
 {
@@ -266,7 +340,6 @@ void buildOptions(int optType)
 
 void recvWithMarkers()
 {
-    // [t:0002]
     static boolean recvInProgress = false;
     static byte ndx = 0;
     char startMarker = '[';
