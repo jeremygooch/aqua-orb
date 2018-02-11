@@ -39,8 +39,8 @@ static PCD8544 lcd;
 
 void setup()
 {
+    // For Debugging
     Serial.begin(9600);
-    /* Serial.println("Arduino is ready"); */
 
     lcd.begin(84, 48);
 
@@ -52,13 +52,12 @@ void setup()
     myservo.attach(pinServo);  // attaches the servo to the servo object
     buildOptions(0);
     Serial.println(servoClose);
-    /* Serial.println("global options are: "); */
+    /* Global Options are: */
     /* Serial.println(offTime); */
     /* Serial.println(openTime); */
     /* Serial.println(servoClose); */
     /* Serial.println(servoOpen); */
     /* Serial.println(label); */
-    /* Serial.println("------------------"); */
 
     timer1->setOnTimer(&mainWaterLoop);
     timer1->Start();
@@ -84,24 +83,15 @@ void btLoop() {
 }
 
 void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svCl) {
-
     if (updateVars == true) {
-        /* Serial.println("must need to update the values"); */
         offTime = ofTim;
         openTime = onTim;
         servoOpen = svOp;
         servoClose = svCl;
-        /* Serial.println(offTime); */
-        /* Serial.println(openTime); */
-        /* Serial.println(servoOpen); */
-        /* Serial.println(servoClose); */
     }
-    /* Serial.println("in main loop, offTime is--"); */
-    /* Serial.println(offTime); */
-    /* Serial.println("in main loop, offTime is--"); */
-    /* Serial.println(offTime); */
-    static int counterSysTest = 5;
-    static int closeCounterSysTest = 5;
+
+    static int counterSysTest = 2;
+    static int closeCounterSysTest = 1;
     static long waterInterval = offTime;
     static long waterOpenTime = openTime;
     String remainingTime;
@@ -202,6 +192,7 @@ String humanReadableTime(double x) {
         }
     } else if (x < 3600 && x >= 60) {
         v = x / 60;
+        if (x == 3599) { lcd.clear(); }
         if (x >= 120) { plural = "s"; }
         else { plural = ""; }
         out = (int)(round(v)) + String("-ish min") + plural;
@@ -227,7 +218,7 @@ void toggleServo(boolean open) {
 void parseData()
 {
     newData = false;
-    /* Serial.println(receivedChars); */
+    String errOut('Invalid option specified.');
     if (receivedChars[0] == 't') {
         if (interruptCMD == false) { // make sure nothing odd is running
             // Temporarily turn the servo for a set amount of time
@@ -236,43 +227,49 @@ void parseData()
             singleCloseCounter = atol(digitsOnly);
 
             buildOptions(0);
-            /* Serial.println(servoClose); */
-            /* Serial.println(servoOpen); */
             singleClose = true;
         }
     } else if (receivedChars[0] == 'f') {
         // Set the frequency and options
-        /* Serial.println("bt command received for update configs..."); */
         timer1->Stop();
         buildOptions(1);
 
         mainWaterLoop(true, offTime, openTime, servoOpen, servoClose);
         timer1->setOnTimer(&mainWaterLoop);
         timer1->Start();
-    /* } */
     } else if (receivedChars[0] == 'q') {
         String out;
+        String prop;
         if (receivedChars[1] == 'f') { // frequency open
             out = offTime;
+            prop = 'f';
         } else if (receivedChars[1] == 'n') { // name/ plant label
             out = label;
+            prop = 'n';
         } else if (receivedChars[1] == 't') { // time open
             out = openTime;
+            prop = 't';
         } else if (receivedChars[1] == 'o') { // open value
             out = servoOpen;
+            prop = 'o';
         } else if (receivedChars[1] == 'c') { // closed value
             out = servoClose;
+            prop = 'c';
         } else {
-            out = 'Invalid option provided';
+            out = errOut;
+            prop = 'e';
         }
         out = '[' + out + ']';
-        BTserial.print(out);
+        BTserial.print(prop + out);
+    } else {
+        BTserial.print('[' + errOut + ']');
     }
 }
 
 void buildOptions(int optType)
 {
-/* f:0000060|t:0005|o:000|c:100|n:asdfghjkl-wertyui-pzxcvbn */
+    // Current Options format
+    /* f:0000060|t:0005|o:000|c:100|n:asdfghjkl-wertyui-pzxcvbn */
     char opts[56];
     if (optType == 0) {
         strcpy (opts, defaultOpts);
