@@ -16,7 +16,7 @@ boolean singleClose = false;
 int singleCloseCounter = 5;
 
 const byte numChars = 60;
-const char defaultOpts[] = "f:00000600t:0002|o:000|c:100|n:Pilea AluminumPlant";
+const char defaultOpts[] = "f=0003600-t=0002-o=000-c=100-n=Pilea AluminumPlant";
 char receivedChars[numChars];
 boolean newData = false;
 
@@ -238,29 +238,63 @@ void parseData()
         timer1->setOnTimer(&mainWaterLoop);
         timer1->Start();
     } else if (receivedChars[0] == 'q') {
-        String out;
-        String prop;
-        if (receivedChars[1] == 'f') { // frequency open
-            out = offTime;
-            prop = 'f';
-        } else if (receivedChars[1] == 'n') { // name/ plant label
-            out = label;
-            prop = 'n';
-        } else if (receivedChars[1] == 't') { // time open
-            out = openTime;
-            prop = 't';
-        } else if (receivedChars[1] == 'o') { // open value
-            out = servoOpen;
-            prop = 'o';
-        } else if (receivedChars[1] == 'c') { // closed value
-            out = servoClose;
-            prop = 'c';
-        } else {
-            out = errOut;
-            prop = 'e';
+        String offTimeS;
+        String labelS;
+        String openTimeS;
+        String servoOpenS;
+        String servoCloseS;
+        String sep;
+        String term;
+        String beginning;
+        String quote;
+
+        offTimeS = offTime;
+        labelS = label;
+        openTimeS = openTime;
+        servoOpenS = servoOpen;
+        servoCloseS = servoClose;
+        beginning = '{';
+        sep = ',';
+        term = ':';
+        quote = '"';
+
+        BTserial.print(beginning +
+                       quote + 'f' + quote + term + offTimeS + sep +
+                       quote + 'n' + quote + term + quote + labelS + quote + sep +
+                       quote + 't' + quote + term + openTimeS + sep +
+                       quote + 'o' + quote + term + servoOpenS + sep +
+                       quote + 'c' + quote + term + servoCloseS + '}');
+
+
+        // BACKWARDS SUPPORT for connecting via device list
+        if (receivedChars[1] == 'n') { // name/ plant label
+            BTserial.print('{' + label + '}');
         }
-        out = '[' + out + ']';
-        BTserial.print(prop + out);
+        
+
+        /* String out; */
+        /* String prop; */
+        /* if (receivedChars[1] == 'f') { // frequency open */
+        /*     out = offTime; */
+        /*     prop = 'f'; */
+        /* } else if (receivedChars[1] == 'n') { // name/ plant label */
+        /*     out = label; */
+        /*     prop = 'n'; */
+        /* } else if (receivedChars[1] == 't') { // time open */
+        /*     out = openTime; */
+        /*     prop = 't'; */
+        /* } else if (receivedChars[1] == 'o') { // open value */
+        /*     out = servoOpen; */
+        /*     prop = 'o'; */
+        /* } else if (receivedChars[1] == 'c') { // closed value */
+        /*     out = servoClose; */
+        /*     prop = 'c'; */
+        /* } else { */
+        /*     out = errOut; */
+        /*     prop = 'e'; */
+        /* } */
+        /* out = '[' + out + ']'; */
+        /* BTserial.print(prop + out); */
     } else {
         BTserial.print('[' + errOut + ']');
     }
