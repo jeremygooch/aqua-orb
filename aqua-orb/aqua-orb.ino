@@ -238,32 +238,42 @@ void parseData()
         timer1->setOnTimer(&mainWaterLoop);
         timer1->Start();
     } else if (receivedChars[0] == 'q') {
-        String offTimeS;
-        String labelS;
-        String openTimeS;
-        String servoOpenS;
-        String servoCloseS;
+        String offTimeV;
+        String labelV;
+        String openTimeV;
+        String servoOpenV;
+        String servoCloseV;
         String sep;
         String term;
         String beginning;
         String quote;
+        String f;
+        String n;
+        String t;
+        String o;
+        String c;
 
-        offTimeS = offTime;
-        labelS = label;
-        openTimeS = openTime;
-        servoOpenS = servoOpen;
-        servoCloseS = servoClose;
+        offTimeV = offTime;
+        labelV = label;
+        openTimeV = openTime;
+        servoOpenV = servoOpen;
+        servoCloseV = servoClose;
         beginning = '{';
         sep = ',';
         term = ':';
         quote = '"';
+        f="frequency";
+        n="name";
+        t="timeOpen";
+        o="servoOpen";
+        c="servoClose";
 
         BTserial.print(beginning +
-                       quote + 'f' + quote + term + offTimeS + sep +
-                       quote + 'n' + quote + term + quote + labelS + quote + sep +
-                       quote + 't' + quote + term + openTimeS + sep +
-                       quote + 'o' + quote + term + servoOpenS + sep +
-                       quote + 'c' + quote + term + servoCloseS + '}');
+                       quote + f + quote + term + offTimeV + sep +
+                       quote + n + quote + term + quote + labelV + quote + sep +
+                       quote + t + quote + term + openTimeV + sep +
+                       quote + o + quote + term + servoOpenV + sep +
+                       quote + c + quote + term + servoCloseV + '}');
 
 
         // BACKWARDS SUPPORT for connecting via device list
