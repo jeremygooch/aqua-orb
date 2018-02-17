@@ -16,19 +16,26 @@ boolean singleClose = false;
 int singleCloseCounter = 5;
 
 const byte numChars = 60;
-const char defaultOpts[] = "f=0003600-t=0002-o=000-c=100-n=Pilea AluminumPlant";
+const char defaultOpts[] = "f=0000020-t=0002-o=000-c=100-n=Pilea AluminumPlant";
 char receivedChars[numChars];
 boolean newData = false;
 
 static long offTime = 32;
 static long openTime = 23;
+static long offTimeBT = 32;
+static long openTimeBT = 23;
 String prevTime;
 int servoOpen = 0;
 int servoClose = 0;
 char label[25];
+int servoOpenBT = 0;
+int servoCloseBT = 0;
+char labelBT[25];
 
 boolean systemTestDone = false;
 boolean interruptCMD = false;
+boolean parsingBTData = false;
+boolean updateParamsFromBT = false;
 
 int servoFlag = 0;
 
@@ -65,7 +72,8 @@ void setup()
 
 void loop()
 {
-    digitalWrite(LED_BUILTIN, LOW);
+    /* digitalWrite(LED_BUILTIN, LOW); */
+    btLoop();
 
     timer1->Update();
 }
@@ -83,93 +91,106 @@ void btLoop() {
 }
 
 void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svCl) {
-    if (updateVars == true) {
-        offTime = ofTim;
-        openTime = onTim;
-        servoOpen = svOp;
-        servoClose = svCl;
-    }
+    if (parsingBTData == false) {
+        if (updateVars == true) {
+            offTime = ofTim;
+            openTime = onTim;
+            servoOpen = svOp;
+            servoClose = svCl;
+        }
 
-    static int counterSysTest = 2;
-    static int closeCounterSysTest = 1;
-    static long waterInterval = offTime;
-    static long waterOpenTime = openTime;
-    String remainingTime;
+        if (updateParamsFromBT) {
+            offTime = offTimeBT;
+            strncpy(label, labelBT, 25);
+            openTime = openTimeBT;
+            /* servoOpen = servoOpenBT; */
+            /* servoClose = servoCloseBT; */
+            updateParamsFromBT = false;
+        }
 
-    if (systemTestDone == false) {
-        lcd.setCursor(0, 0);
-        if (counterSysTest > 0) {
-            lcd.print(String("SYS CHECK IN: ") + String(counterSysTest) + String("s"));
-            counterSysTest--;
-        } else if (counterSysTest == 0) {
+        static int counterSysTest = 2;
+        static int closeCounterSysTest = 1;
+        static long waterInterval = offTime;
+        static long waterOpenTime = openTime;
+        String remainingTime;
+
+        if (systemTestDone == false) {
             lcd.setCursor(0, 0);
-            lcd.print("TESTING SYSTEM                   ");
-            toggleServo(true);
-            if (closeCounterSysTest > 0) {
-                closeCounterSysTest--;
-            } else {
+            if (counterSysTest > 0) {
+                lcd.print(String("SYS CHECK IN: ") + String(counterSysTest) + String("s"));
+                counterSysTest--;
+            } else if (counterSysTest == 0) {
                 lcd.setCursor(0, 0);
-                lcd.print("TESTS COMPLETE");
-                toggleServo(false);
-                systemTestDone = true;
+                lcd.print("TESTING SYSTEM                   ");
+                toggleServo(true);
+                if (closeCounterSysTest > 0) {
+                    closeCounterSysTest--;
+                } else {
+                    lcd.setCursor(0, 0);
+                    lcd.print("TESTS COMPLETE");
+                    toggleServo(false);
+                    systemTestDone = true;
+                }
             }
         }
-    }
 
-    if (systemTestDone && interruptCMD == false) {
-        btLoop();
-        /* Serial.println("waterInterval"); */
-        /* Serial.println(waterInterval); */
-        if (waterInterval > 0) {
-            // Only update lcd if the time has changed
-            remainingTime= humanReadableTime(waterInterval);
-            if (remainingTime != prevTime) {
-                lcd.setCursor(0, 0);
-                lcd.print("Watering in:  ");
-                lcd.setCursor(0, 1);
-                lcd.print(String(remainingTime) + String("     "));
-                lcd.setCursor(0, 3);
-                lcd.print(String(label));
-                waterInterval--;
-            }
-        } else {
-            toggleServo(true);
-            if (waterOpenTime > 0) {
-                remainingTime= humanReadableTime(waterOpenTime);
-                lcd.setCursor(0, 0);
-                lcd.print("Watering.......");
-                lcd.setCursor(0, 1);
-                lcd.print(String(remainingTime) + String("     "));
-                lcd.setCursor(0, 3);
-                lcd.print(String(label));
-                waterOpenTime--;
+        if (systemTestDone && interruptCMD == false) {
+            /* Serial.println("waterInterval"); */
+            /* Serial.println(waterInterval); */
+            if (waterInterval > 0) {
+                // Only update lcd if the time has changed
+                remainingTime= humanReadableTime(waterInterval);
+                if (remainingTime != prevTime) {
+                    // To optimize.. remove clears and combine common renders
+                    lcd.setCursor(0, 0);
+                    lcd.print("Watering in:  ");
+                    lcd.setCursor(0, 1);
+                    lcd.print(String(remainingTime) + String("     "));
+                    lcd.setCursor(0, 3);
+                    lcd.print(String(label));
+                    waterInterval--;
+                }
             } else {
-                toggleServo(false);
-                waterOpenTime = openTime;
-                waterInterval = offTime;
+                toggleServo(true);
+                if (waterOpenTime > 0) {
+                    remainingTime= humanReadableTime(waterOpenTime);
+                    // To optimize.. remove clears and combine common renders
+                    lcd.clear();
+                    lcd.setCursor(0, 0);
+                    lcd.print("Watering.......");
+                    lcd.setCursor(0, 1);
+                    lcd.print(String(remainingTime) + String("     "));
+                    lcd.setCursor(0, 3);
+                    lcd.print(String(label));
+                    waterOpenTime--;
+                } else {
+                    toggleServo(false);
+                    waterOpenTime = openTime;
+                    waterInterval = offTime;
+                }
             }
         }
-    }
 
-    if (singleClose) {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("WATER CMD RCVD");
-        toggleServo(true);
-        if (singleCloseCounter > 0) {
-            remainingTime = humanReadableTime(singleCloseCounter);
-            lcd.setCursor(0, 1);
-            lcd.print("Closing in: ");
-            lcd.setCursor(0, 2);
-            lcd.print(String(remainingTime) + String("     "));
-            interruptCMD = true;
-            singleCloseCounter--;
-        } else {
+        if (singleClose) {
             lcd.clear();
-            toggleServo(false);
-            singleCloseCounter = 5;
-            interruptCMD = false;
-            singleClose = false;
+            lcd.setCursor(0, 0);
+            lcd.print("WATER CMD RCVD");
+            toggleServo(true);
+            if (singleCloseCounter > 0) {
+                remainingTime = humanReadableTime(singleCloseCounter);
+                lcd.setCursor(0, 1);
+                lcd.print("Closing in: ");
+                lcd.setCursor(0, 2);
+                lcd.print(String(remainingTime) + String("     "));
+                interruptCMD = true;
+                singleCloseCounter--;
+            } else {
+                lcd.clear();
+                toggleServo(false);
+                singleCloseCounter = 5;
+                interruptCMD = false;
+                singleClose = false;
+            }
         }
     }
 }
@@ -219,6 +240,9 @@ void parseData()
 {
     newData = false;
     String errOut('Invalid option specified.');
+
+    Serial.println("parsing data....");
+    parsingBTData = true;
     if (receivedChars[0] == 't') {
         if (interruptCMD == false) { // make sure nothing odd is running
             // Temporarily turn the servo for a set amount of time
@@ -226,17 +250,17 @@ void parseData()
             char *digitsOnly = receivedChars + (len < 4 ? 0 : len - 4);
             singleCloseCounter = atol(digitsOnly);
 
-            buildOptions(0);
+            buildOptionsFromBT();
             singleClose = true;
         }
     } else if (receivedChars[0] == 'f') {
         // Set the frequency and options
-        timer1->Stop();
-        buildOptions(1);
+        /* timer1->Stop(); */
+        buildOptionsFromBT();
 
-        mainWaterLoop(true, offTime, openTime, servoOpen, servoClose);
-        timer1->setOnTimer(&mainWaterLoop);
-        timer1->Start();
+        /* mainWaterLoop(false, offTime, openTime, servoOpen, servoClose); */
+        /* timer1->setOnTimer(&mainWaterLoop); */
+        /* timer1->Start(); */
     } else if (receivedChars[0] == 'q') {
         String offTimeV;
         String labelV;
@@ -280,34 +304,10 @@ void parseData()
         if (receivedChars[1] == 'n') { // name/ plant label
             BTserial.print('{' + label + '}');
         }
-        
-
-        /* String out; */
-        /* String prop; */
-        /* if (receivedChars[1] == 'f') { // frequency open */
-        /*     out = offTime; */
-        /*     prop = 'f'; */
-        /* } else if (receivedChars[1] == 'n') { // name/ plant label */
-        /*     out = label; */
-        /*     prop = 'n'; */
-        /* } else if (receivedChars[1] == 't') { // time open */
-        /*     out = openTime; */
-        /*     prop = 't'; */
-        /* } else if (receivedChars[1] == 'o') { // open value */
-        /*     out = servoOpen; */
-        /*     prop = 'o'; */
-        /* } else if (receivedChars[1] == 'c') { // closed value */
-        /*     out = servoClose; */
-        /*     prop = 'c'; */
-        /* } else { */
-        /*     out = errOut; */
-        /*     prop = 'e'; */
-        /* } */
-        /* out = '[' + out + ']'; */
-        /* BTserial.print(prop + out); */
     } else {
-        BTserial.print('[' + errOut + ']');
+        BTserial.println('[' + errOut + ']');
     }
+    parsingBTData = false;
 }
 
 void buildOptions(int optType)
@@ -347,6 +347,39 @@ void buildOptions(int optType)
     label[25] = '\0';
 }
 
+void buildOptionsFromBT()
+{
+    // Current Options format
+    /* f:0000060|t:0005|o:000|c:100|n:asdfghjkl-wertyui-pzxcvbn */
+    char optsX[56];
+    strcpy (optsX, receivedChars);
+
+    char offTimeArrX[7];
+    strncpy (offTimeArrX, optsX + 2, 7);
+    offTimeArrX[7] = '\0';
+    offTimeBT = atol(offTimeArrX);
+
+    char onTimeArrX[4];
+    strncpy (onTimeArrX, optsX + 12, 4);
+    onTimeArrX[4] = '\0';
+    openTimeBT = atol (onTimeArrX);
+
+    char servoOpenArrX[3];
+    strncpy (servoOpenArrX, optsX + 19, 3);
+    servoOpenArrX[3] = '\0';
+    servoOpenBT = atol(servoOpenArrX);
+
+    char servoCloseArrX[3];
+    strncpy (servoCloseArrX, optsX + 25, 3);
+    servoCloseArrX[3] = '\0';
+    servoCloseBT = atol(servoCloseArrX);
+
+    strncpy (labelBT, optsX + 31, 25);
+    labelBT[25] = '\0';
+
+    updateParamsFromBT = true;
+}
+
 void recvWithMarkers()
 {
     static boolean recvInProgress = false;
@@ -368,6 +401,8 @@ void recvWithMarkers()
                 ndx = 0;
                 newData = true;
             }
-        } else if (rc == startMarker) { recvInProgress = true; }
+        } else if (rc == startMarker) {
+            recvInProgress = true;
+        }
     }
 }
