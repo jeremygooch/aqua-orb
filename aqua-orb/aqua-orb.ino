@@ -3,11 +3,6 @@
 #include <TimerObject.h>
 #include <PCD8544.h>
 
-// TODO:
-// Refactor buildOptions and global variables for bt
-// Open close variables????
-
-
 SoftwareSerial BTserial(8, 9); // RX | TX
 
 TimerObject *timer1 = new TimerObject(1000); // Main loop timer
@@ -25,12 +20,14 @@ static long offTime = 32;
 static long openTime = 23;
 static long offTimeBT = 32;
 static long openTimeBT = 23;
+static long servoOpen = 0;
+static long servoClose = 0;
+
+
+int servoOpenBT = 50;
+static long servoCloseBT = 0;
 String prevTime;
-int servoOpen = 0;
-int servoClose = 0;
 char label[25];
-int servoOpenBT = 0;
-int servoCloseBT = 0;
 char labelBT[25];
 
 boolean systemTestDone = false;
@@ -64,7 +61,7 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
 
     myservo.attach(pinServo);  // attaches the servo to the servo object
-    buildOptions(0);
+    buildOptions();
     Serial.println(servoClose);
 
     timer1->setOnTimer(&mainWaterLoop);
@@ -74,7 +71,6 @@ void setup()
 void loop()
 {
     btLoop();
-
     timer1->Update();
 }
 
@@ -93,7 +89,9 @@ void mainWaterLoop() {
             offTime = offTimeBT;
             strncpy(label, labelBT, 25);
             openTime = openTimeBT;
-            /* servoOpen = servoOpenBT; */
+            Serial.println("after?");
+            Serial.println(servoOpenBT);
+            servoOpen = servoOpenBT;
             /* servoClose = servoCloseBT; */
             lcd.clear();
             updateParamsFromBT = false;
@@ -226,7 +224,12 @@ void parseData()
         char servoOpenArrX[3];
         strncpy (servoOpenArrX, optsX + 19, 3);
         servoOpenArrX[3] = '\0';
+        Serial.println("b4 processing");
+        Serial.println(servoOpenArrX);
         servoOpenBT = atol(servoOpenArrX);
+
+        Serial.println("servo open will now be");
+        Serial.println(servoOpenBT);
 
         char servoCloseArrX[3];
         strncpy (servoCloseArrX, optsX + 25, 3);
@@ -288,16 +291,12 @@ void parseData()
     parsingBTData = false;
 }
 
-void buildOptions(int optType)
+void buildOptions()
 {
     // Current Options format
     /* f:0000060|t:0005|o:000|c:100|n:asdfghjkl-wertyui-pzxcvbn */
     char opts[56];
-    if (optType == 0) {
-        strcpy (opts, defaultOpts);
-    } else {
-        strcpy (opts, receivedChars);
-    }
+    strcpy (opts, defaultOpts);
 
     char offTimeArr[7];
     strncpy (offTimeArr, opts + 2, 7);
@@ -323,39 +322,6 @@ void buildOptions(int optType)
 
     strncpy (label, opts + 31, 25);
     label[25] = '\0';
-}
-
-void buildOptionsFromBT()
-{
-    // Current Options format
-    /* f:0000060|t:0005|o:000|c:100|n:asdfghjkl-wertyui-pzxcvbn */
-    char optsX[56];
-    strcpy (optsX, receivedChars);
-
-    char offTimeArrX[7];
-    strncpy (offTimeArrX, optsX + 2, 7);
-    offTimeArrX[7] = '\0';
-    offTimeBT = atol(offTimeArrX);
-
-    char onTimeArrX[4];
-    strncpy (onTimeArrX, optsX + 12, 4);
-    onTimeArrX[4] = '\0';
-    openTimeBT = atol (onTimeArrX);
-
-    char servoOpenArrX[3];
-    strncpy (servoOpenArrX, optsX + 19, 3);
-    servoOpenArrX[3] = '\0';
-    servoOpenBT = atol(servoOpenArrX);
-
-    char servoCloseArrX[3];
-    strncpy (servoCloseArrX, optsX + 25, 3);
-    servoCloseArrX[3] = '\0';
-    servoCloseBT = atol(servoCloseArrX);
-
-    strncpy (labelBT, optsX + 31, 25);
-    labelBT[25] = '\0';
-
-    updateParamsFromBT = true;
 }
 
 void recvWithMarkers()
