@@ -3,6 +3,13 @@
 #include <TimerObject.h>
 #include <PCD8544.h>
 
+// TODO:
+// Fix flickering screen
+// refactor lcd printing globally
+// Refactor buildOptions and global variables for bt
+// Open close variables????
+
+
 SoftwareSerial BTserial(8, 9); // RX | TX
 
 TimerObject *timer1 = new TimerObject(1000); // Main loop timer
@@ -36,6 +43,9 @@ boolean systemTestDone = false;
 boolean interruptCMD = false;
 boolean parsingBTData = false;
 boolean updateParamsFromBT = false;
+String closeMsg("Watering in:  ");
+String openMsg("Watering for:  ");
+
 
 int servoFlag = 0;
 
@@ -105,6 +115,7 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
             openTime = openTimeBT;
             /* servoOpen = servoOpenBT; */
             /* servoClose = servoCloseBT; */
+            lcd.clear();
             updateParamsFromBT = false;
         }
 
@@ -126,8 +137,9 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
                 if (closeCounterSysTest > 0) {
                     closeCounterSysTest--;
                 } else {
-                    lcd.setCursor(0, 0);
-                    lcd.print("TESTS COMPLETE");
+                    /* lcd.setCursor(0, 0); */
+                    /* lcd.print("TESTS COMPLETE"); */
+                    lcd.clear();
                     toggleServo(false);
                     systemTestDone = true;
                 }
@@ -135,17 +147,15 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
         }
 
         if (systemTestDone && interruptCMD == false) {
-            /* Serial.println("waterInterval"); */
-            /* Serial.println(waterInterval); */
             if (waterInterval > 0) {
-                // Only update lcd if the time has changed
                 remainingTime= humanReadableTime(waterInterval);
                 if (remainingTime != prevTime) {
                     // To optimize.. remove clears and combine common renders
                     lcd.setCursor(0, 0);
-                    lcd.print("Watering in:  ");
+                    /* String msg = ("Watering in:  "); */
+                    lcd.print(closeMsg);
                     lcd.setCursor(0, 1);
-                    lcd.print(String(remainingTime) + String("     "));
+                    lcd.print(String(remainingTime) + String("               "));
                     lcd.setCursor(0, 3);
                     lcd.print(String(label));
                     waterInterval--;
@@ -155,15 +165,15 @@ void mainWaterLoop(boolean updateVars, long ofTim, long onTim, int svOp, int svC
                 if (waterOpenTime > 0) {
                     remainingTime= humanReadableTime(waterOpenTime);
                     // To optimize.. remove clears and combine common renders
-                    lcd.clear();
                     lcd.setCursor(0, 0);
-                    lcd.print("Watering.......");
+                    lcd.print(openMsg);
                     lcd.setCursor(0, 1);
                     lcd.print(String(remainingTime) + String("     "));
                     lcd.setCursor(0, 3);
                     lcd.print(String(label));
                     waterOpenTime--;
                 } else {
+                    lcd.clear();
                     toggleServo(false);
                     waterOpenTime = openTime;
                     waterInterval = offTime;
