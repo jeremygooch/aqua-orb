@@ -76,10 +76,12 @@ void loop()
 
 void btLoop() {
     if (BTserial.available() > 0) {
+        myservo.detach();
         recvWithMarkers();
     }
     if (newData) {
         parseData();
+        myservo.attach(pinServo);
     }
 }
 
