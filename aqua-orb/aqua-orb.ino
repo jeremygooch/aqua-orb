@@ -12,7 +12,7 @@ Servo myservo;  // create servo object to control a servo
 boolean debug = true;
 
 const byte numChars = 60;
-const char defaultOpts[] = "f=0000020-t=0002-o=000-c=100-n=Pilea AluminumPlant";
+const char defaultOpts[] = "f=0027000-t=0002-o=000-c=100-n=My Plant";
 char receivedChars[numChars];
 boolean newData = false;
 
@@ -76,7 +76,7 @@ void loop()
 
 void btLoop() {
     if (BTserial.available() > 0) {
-        myservo.detach();
+        myservo.detach(); // Switching servo off when receiving bt signal, since will block pin 9 for serial output.
         recvWithMarkers();
     }
     if (newData) {
