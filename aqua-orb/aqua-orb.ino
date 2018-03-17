@@ -23,7 +23,6 @@ static long openTimeBT = 23;
 static long servoOpen = 0;
 static long servoClose = 0;
 
-
 int servoOpenBT = 50;
 static long servoCloseBT = 0;
 String prevTime;
@@ -43,6 +42,20 @@ String note;
 
 
 int servoFlag = 0;
+
+
+int moisture_sensor_pin = A5;
+int cur_moisture;
+int cur_moisture_buffer;
+boolean water_by_moisture = false;
+static long moisture_mark = 0;
+static long moisture_mark_buffer = 0;
+static long moisture_water_time = 0;
+static long moisture_water_time_elapsed = 0;
+boolean moisture_pause = false;
+int moisture_pause_time = 10;
+
+
 
 #define pinServo A0
 
@@ -81,11 +94,15 @@ void btLoop() {
     }
     if (newData) {
         parseData();
+        Serial.println("attached my servo");
         myservo.attach(pinServo);
     }
 }
 
 void mainWaterLoop() {
+    cur_moisture = analogRead(moisture_sensor_pin);
+    cur_moisture = map(cur_moisture, 1023, 180, 0, 100);
+
     if (parsingBTData == false) {
         if (updateParamsFromBT) {
             offTime = offTimeBT;
@@ -125,28 +142,81 @@ void mainWaterLoop() {
         }
 
         if (systemTestDone && interruptCMD == false) {
-            if (waterInterval > 0) {
-                remainingTime= humanReadableTime(waterInterval);
-                if (remainingTime != prevTime) {
-                    timeLeft = remainingTime;
-                    updateLCD(closeMsg);
-                    waterInterval--;
+            if (water_by_moisture == false) {
+                if (waterInterval > 0) {
+                    remainingTime= humanReadableTime(waterInterval);
+                    if (remainingTime != prevTime) {
+                        timeLeft = remainingTime;
+                        updateLCD(closeMsg);
+                        waterInterval--;
+                    }
+                } else {
+                    toggleServo(true);
+                    if (waterOpenTime > 0) {
+                        remainingTime= humanReadableTime(waterOpenTime);
+                        // To optimize.. remove clears and combine common renders
+                        timeLeft = remainingTime;
+                        updateLCD(openMsg);
+                        waterOpenTime--;
+                    } else {
+                        lcd.clear();
+                        toggleServo(false);
+                        waterOpenTime = openTime;
+                        waterInterval = offTime;
+                        note = "";
+                    }
                 }
             } else {
-                toggleServo(true);
-                if (waterOpenTime > 0) {
-                    remainingTime= humanReadableTime(waterOpenTime);
-                    // To optimize.. remove clears and combine common renders
-                    timeLeft = remainingTime;
-                    updateLCD(openMsg);
-                    waterOpenTime--;
-                } else {
+                Serial.println("Going to water by moisture now...");
+                /* servoOpen = 0; // set defaults */
+                /* servoClose = 100; */
+
+                if (cur_moisture <= moisture_mark && moisture_pause == false) {
                     lcd.clear();
-                    toggleServo(false);
-                    waterOpenTime = openTime;
-                    waterInterval = offTime;
-                    note = "";
+                    lcd.println(String("Watering for:"));
+                    lcd.println(String(moisture_water_time) + String("sec"));
+                    lcd.setCursor(0, 3);
+                    lcd.print(String(label) + String(note));
+                    myservo.detach();
+                    myservo.attach(pinServo);
+
+                    if (moisture_water_time_elapsed > 0) {
+                        /* toggleServo(true); */
+                        myservo.write(0);
+                        Serial.println("opening servo now...");
+                        moisture_water_time_elapsed--;
+                    } else {
+                        moisture_water_time_elapsed = moisture_water_time;
+                        /* toggleServo(false); */
+                        myservo.write(100);
+                        Serial.println("closing servo now...");
+                        moisture_pause = true;
+                    }
+
+                    /* moisture_pause_time = 900; */
+                } else {
+                    if (moisture_pause == true && moisture_pause_time != 0) {
+                        moisture_pause_time--;
+                        lcd.clear();
+                        lcd.println(String(cur_moisture) + String("% Moisture"));
+                        lcd.println(String("Water settling"));
+                        lcd.setCursor(0, 3);
+                        lcd.print(String(label) + String(note));
+                    } else if (moisture_pause_time == 0) {
+                        moisture_pause_time = 10;
+                        moisture_pause = false;
+                    }
+                    if (moisture_mark_buffer != moisture_mark ||
+                        cur_moisture_buffer != cur_moisture) {
+                        lcd.clear();
+                        lcd.println(String(cur_moisture) + String("% Moisture"));
+                        lcd.println(String("Water at ") + String(moisture_mark) + String("%"));
+                        lcd.setCursor(0, 3);
+                        lcd.print(String(label) + String(note));
+                    }
                 }
+                moisture_mark_buffer = moisture_mark;
+                cur_moisture_buffer = cur_moisture;
             }
         }
     }
@@ -190,6 +260,10 @@ void updateLCD(String lcdmsg) {
 }
 
 void toggleServo(boolean open) {
+    Serial.println("inside servo open");
+    Serial.println(String("servo read ") + String(myservo.read()));
+    Serial.println(String("open ") + String(servoOpen));
+    Serial.println(String("close ") + String(servoClose));
     if (open == true) {
         if (myservo.read() != servoOpen) {
             myservo.write(servoOpen);
@@ -243,6 +317,28 @@ void parseData()
 
         updateParamsFromBT = true;
         note = "*";
+        water_by_moisture = false;
+
+    } else if (receivedChars[0] == 'm') {
+        // m=99t=999 (~16.65 minutes)
+        /* String moisture_mark; */
+        /* String moisture_water_time; */
+
+        char mOpts[9];
+        strcpy (mOpts, receivedChars);
+
+        char mMark[2];
+        strncpy (mMark, mOpts + 2, 2);
+        mMark[2] = '\0';
+        moisture_mark = atol(mMark);
+
+        char mTime[3];
+        strncpy (mTime, mOpts + 6, 3);
+        mTime[3] = '\0';
+        moisture_water_time = atol(mTime);
+        moisture_water_time_elapsed = moisture_water_time;
+
+        water_by_moisture = true;
 
     } else if (receivedChars[0] == 'q') {
         String offTimeV;
