@@ -347,10 +347,10 @@ void parseData()
         String labelV;
         String openTimeV;
         String servoOpenV;
-        String servoCloseV;
         String curMoisture;
         String moistureMark;
         String moistureWaterTime;
+        String waterType;
         String sep;
         String term;
         String beginning;
@@ -359,16 +359,17 @@ void parseData()
         String n;
         String t;
         String o;
-        String c;
         String cm;
         String mm;
         String mw;
+        String wt;
 
         offTimeV = offTime;
         labelV = label;
         openTimeV = openTime;
         servoOpenV = servoOpen;
-        servoCloseV = servoClose;
+        waterType = ((water_by_moisture == false) ? "timer" : "moisture");
+        /* waterType = "moisture"; */
         curMoisture = cur_moisture;
         moistureMark = moisture_mark;
         moistureWaterTime = moisture_water_time;
@@ -380,17 +381,17 @@ void parseData()
         n="name";
         t="timeOpen";
         o="servoOpen";
-        c="servoClose";
-        cm="currentMoisture";
-        mm="moistureMark";
+        cm="curMoisture";
+        mm="moistMark";
         mw="moistWaterTm";
+        wt="waterType";
 
         BTserial.print(beginning +
                        quote + f + quote + term + offTimeV + sep +
                        quote + n + quote + term + quote + labelV + quote + sep +
                        quote + t + quote + term + openTimeV + sep +
                        quote + o + quote + term + servoOpenV + sep +
-                       quote + c + quote + term + servoCloseV + sep +
+                       quote + wt + quote + term + quote + waterType + quote + sep +
                        quote + cm + quote + term + curMoisture + sep +
                        quote + mm + quote + term + moistureMark + sep +
                        quote + mw + quote + term + moistureWaterTime + '}');
