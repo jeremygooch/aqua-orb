@@ -236,7 +236,7 @@ String humanReadableTime(double x) {
         if (x >= 7200) {
             out = (int)(round(v)) + String("-ish hrs") + plural;
         } else {
-            out = String("about an hour or so");
+            out = String("about an hr");
         }
     } else if (x < 3600 && x >= 60) {
         v = x / 60;
@@ -255,6 +255,8 @@ void updateLCD(String lcdmsg) {
     lcd.print(lcdmsg);
     lcd.setCursor(0, 1);
     lcd.print(String(timeLeft) + String("               "));
+    lcd.setCursor(0, 2);
+    lcd.println(String(cur_moisture) + String("% Moisture"));
     lcd.setCursor(0, 3);
     lcd.print(String(label) + String(note));
 }
@@ -346,6 +348,9 @@ void parseData()
         String openTimeV;
         String servoOpenV;
         String servoCloseV;
+        String curMoisture;
+        String moistureMark;
+        String moistureWaterTime;
         String sep;
         String term;
         String beginning;
@@ -355,12 +360,18 @@ void parseData()
         String t;
         String o;
         String c;
+        String cm;
+        String mm;
+        String mw;
 
         offTimeV = offTime;
         labelV = label;
         openTimeV = openTime;
         servoOpenV = servoOpen;
         servoCloseV = servoClose;
+        curMoisture = cur_moisture;
+        moistureMark = moisture_mark;
+        moistureWaterTime = moisture_water_time;
         beginning = '{';
         sep = ',';
         term = ':';
@@ -370,13 +381,19 @@ void parseData()
         t="timeOpen";
         o="servoOpen";
         c="servoClose";
+        cm="currentMoisture";
+        mm="moistureMark";
+        mw="moistWaterTm";
 
         BTserial.print(beginning +
                        quote + f + quote + term + offTimeV + sep +
                        quote + n + quote + term + quote + labelV + quote + sep +
                        quote + t + quote + term + openTimeV + sep +
                        quote + o + quote + term + servoOpenV + sep +
-                       quote + c + quote + term + servoCloseV + '}');
+                       quote + c + quote + term + servoCloseV + sep +
+                       quote + cm + quote + term + curMoisture + sep +
+                       quote + mm + quote + term + moistureMark + sep +
+                       quote + mw + quote + term + moistureWaterTime + '}');
 
 
         // BACKWARDS SUPPORT for connecting via device list
